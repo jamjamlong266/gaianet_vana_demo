@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Mod Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 py-4">
+                <h1 class="text-2xl font-bold text-gray-900">Reddit Mod Assistant</h1>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="flex-1 flex">
+            <!-- Sidebar -->
+            <div class="w-80 bg-white border-r border-gray-200 p-4 hidden md:block">
+                <div class="space-y-4">
+                    <h2 class="text-lg font-semibold text-gray-700">Example Prompts</h2>
+                    <div class="space-y-2">
+                        <button class="example-prompt w-full text-left p-2 rounded hover:bg-gray-100 text-sm">
+                            "Analyze this post title: 'Why I think Minecraft is better than Roblox'"
+                        </button>
+                        <button class="example-prompt w-full text-left p-2 rounded hover:bg-gray-100 text-sm">
+                            "Help me create an engaging title for a post about my first gaming PC build"
+                        </button>
+                        <button class="example-prompt w-full text-left p-2 rounded hover:bg-gray-100 text-sm">
+                            "Is this comment appropriate for r/science: 'This study is totally fake news!'"
+                        </button>
+                        <button class="example-prompt w-full text-left p-2 rounded hover:bg-gray-100 text-sm">
+                            "Suggest improvements for my meme post about programming bugs"
+                        </button>space-x-2
+                    </div>
+
+                    <div class="mt-8 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700 mb-2">About ModAssistant</h3>
+                        <p class="text-sm text-gray-600">
+                            I analyze posts and comments, check for similar content, and provide moderation recommendations based on community guidelines and Reddit's rules.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat interface -->
+            <div class="flex-1 flex flex-col bg-white">
+                <div id="chat-messages" class="flex-1 p-4 space-y-4 overflow-y-auto"></div>
+                <div id="loading-indicator" class="hidden">
+                    <div class="flex items-center justify-start p-4">
+                        <div class="flex space-x-2">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Input area -->
+                <div class="border-t border-gray-200 p-4">
+                    <form id="chat-form" class="flex space-x-4">
+                        <textarea
+                            id="message-input"
+                            class="flex-1 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2 resize-none"
+                            placeholder="Type your message here..."
+                            rows="3"
+                        ></textarea>
+                        <button
+                            type="submit"
+                            class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            Send
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const examplePrompts = document.querySelectorAll('.example-prompt');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // Add initial welcome message
+        addMessage('assistant', `Hello! I'm u/ModAssistant, a machine learning-based AI moderator assistant here to help you navigate the Reddit community. How can I help you today?`);
+
+        messageInput.addEventListener('keydown', (e) => {
+            // Check if it's Enter key and not Shift+Enter
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Prevent default to avoid new line
+                
+                // Get trimmed input value
+                const message = messageInput.value.trim();
+                
+                // Only submit if message is not empty
+                if (message) {
+                    chatForm.requestSubmit(); // This triggers the form submission
+                }
+            }
+        });
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Get trimmed input value
+            const message = messageInput.value.trim();
+            
+            // Return early if message is empty
+            if (!message) {
+                messageInput.value = ''; // Clear any whitespace
+                return;
+            }
+
+            // Disable the form while loading
+            const submitButton = chatForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            messageInput.disabled = true;
+
+            // Add user message to chat
+            addMessage('user', message);
+            messageInput.value = '';
+            
+            // Show loading indicator
+            loadingIndicator.classList.remove('hidden');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message }),
+                });
+
+                const data = await response.json();
+                addMessage('assistant', data.response);
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+            } finally {
+                // Hide loading indicator and re-enable form
+                loadingIndicator.classList.add('hidden');
+                submitButton.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
+            }
+        });
+
+        // Handle example prompt clicks
+        examplePrompts.forEach(button => {
+            button.addEventListener('click', () => {
+                messageInput.value = button.textContent.trim();
+                messageInput.focus();
+            });
+        });
+
+        // Add this configuration before using marked
+        marked.setOptions({
+            sanitize: true,
+            sanitizer: function(text) {
+                return DOMPurify.sanitize(text);
+            }
+        });
+
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `max-w-3xl rounded-lg p-4 ${
+                role === 'user'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-800'
+            }`;
+            
+            // Parse markdown content
+            messageBubble.innerHTML = marked.parse(content);
+            
+            // Add some basic styles for markdown elements
+            const style = document.createElement('style');
+            style.textContent = `
+                .max-w-3xl strong {
+                    font-weight: bold;
+                }
+                .max-w-3xl p {
+                    margin-bottom: 0.5rem;
+                }
+                .max-w-3xl ul, .max-w-3xl ol {
+                    margin-left: 1.5rem;
+                    margin-bottom: 0.5rem;
+                }
+                .max-w-3xl h1, .max-w-3xl h2, .max-w-3xl h3, .max-w-3xl h4 {
+                    font-weight: bold;
+                    margin-bottom: 0.5rem;
+                }
+            `;
+            document.head.appendChild(style);
+            
+            messageDiv.appendChild(messageBubble);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>
