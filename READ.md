@@ -10,7 +10,7 @@ A web-based AI assistant that helps Reddit moderators analyze posts, comments, a
 - Example prompts for common moderation scenarios
 - Analyzes posts and comments with structured output (Title, Subreddit, Text, Hashtags)
 - Provides clear APPROVED/REJECTED decisions with reasoning
-- Responsive design with mobile support
+- Show related post or pasted post with post URL link.
 
 ## Screenshots
 
